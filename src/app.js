@@ -4,6 +4,7 @@ import cors from 'cors';
 import config from './config.js';
 import authRoutes from './routes/auth.js';
 import productsRoutes from './routes/products.js';
+import ordersRoutes from './routes/orders.js';
 import { errorHandler } from './middleware/error.js';
 import { notFound } from './lib/errors.js';
 
@@ -26,6 +27,7 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/auth', authRoutes);
 app.use('/products', productsRoutes);
+app.use('/orders', ordersRoutes);
 
 // 404 Handler for undefined routes
 app.use((req, res, next) => {
