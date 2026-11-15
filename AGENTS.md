@@ -4,7 +4,7 @@ Inventory & order REST API (products, stock, orders) written to demonstrate corr
 transactional behaviour under concurrency (no overselling) with Node.js + Express + SQL
 (PostgreSQL primary, MySQL-compatible). Junior backend portfolio project.
 Timebox: 3 days core + optional extras. Code, commits, identifiers: English.
-README: Thai or English. API only - no frontend.
+README: Thai or English. API only - the only UI is the optional static demo page (see Demo section).
 
 ## Stack
 - Node.js LTS (>= 20.6), ES modules ("type": "module"), Express (target Express 5 - check `npm ls express`)
@@ -23,10 +23,12 @@ lockstock-api/
     server.js          (loads env, listens)
     config.js  db.js
     middleware/        auth.js  requireRole.js  error.js  validate.js  rateLimit.js
-    routes/            auth.js  products.js  orders.js  reports.js
+    routes/            auth.js  products.js  orders.js  reports.js  demo.js (optional)
     services/          orders.js  stock.js     (all transactional logic lives here)
+    services/demo/     (optional: oversell.js, naivePlaceOrder.js - see Demo section)
     lib/               money.js  errors.js  withRetry.js
   test/                *.test.js  helpers.js (assertStockInvariant, factories)
+  public/              (optional demo page: index.html, demo.js, demo.css)
 
 ## Data model (Knex migrations; must work on PostgreSQL and MySQL)
 users(id, email unique lowercase, password_hash, role 'admin'|'customer', created_at)
@@ -99,7 +101,7 @@ FORBIDDEN 403, NOT_FOUND 404, EMAIL_TAKEN 409, SKU_TAKEN 409, INSUFFICIENT_STOCK
 - The CHECK (stock_quantity >= 0) is defence in depth only (MySQL < 8.0.16 ignores CHECK);
   the application guard is the primary protection.
 
-## Gotchas that MUST be handled (see PDF section 9)
+## Gotchas that MUST be handled (see PDF section 10)
 - pg returns NUMERIC, SUM() and COUNT() as strings; mysql2 returns DECIMAL/SUM as strings.
   Convert at the API edge (lib/money.js, Number()).
 - MySQL returns booleans as 0/1: convert is_active to a real boolean in the serializer.
@@ -107,6 +109,21 @@ FORBIDDEN 403, NOT_FOUND 404, EMAIL_TAKEN 409, SKU_TAKEN 409, INSUFFICIENT_STOCK
 - Postgres default isolation is READ COMMITTED, MySQL/InnoDB REPEATABLE READ; locking reads
   (FOR UPDATE) see the latest committed data in both, which is why the design relies on them.
 - Express 5: async handler errors reach the error middleware automatically (verify the version).
+
+## Demo page (optional, day 4 - build ONLY when the task asks for it)
+- Purpose: show visually that the row lock prevents overselling. Mounted ONLY when DEMO_ENABLED=true;
+  otherwise the demo API and page return 404.
+- POST /demo/api/oversell {stock 1-100 (default 5), buyers 1-50 (default 20), mode 'safe'|'unsafe'}
+  (public, 5 req/min/IP, one run at a time -> 409 DEMO_BUSY). It creates a throwaway product
+  (sku DEMO-<random>) and a non-loginable demo user, fires `buyers` concurrent order attempts, returns
+  {mode, stock, buyers, succeeded, rejected, errors, final_stock, invariant_ok, elapsed_ms,
+  results:[{i, outcome, code?, ms}]}, then deletes everything it created (also when it fails).
+- 'safe' calls the real placeOrder. 'unsafe' calls a DELIBERATELY WRONG naive implementation
+  (unlocked read, short delay, absolute write) that lives only in src/services/demo/ and must NEVER
+  be imported by routes/orders or any production path.
+- The page is static (public/index.html, demo.js, demo.css), served at /demo with express.static.
+  No inline scripts or inline event handlers: helmet's default CSP blocks them. UI text in Thai.
+- Never change placeOrder/cancelOrder or the concurrency rules above for the sake of the demo.
 
 ## Conventions
 - Routes stay thin; transactional logic in services/ so it can be tested directly.
@@ -122,4 +139,5 @@ FORBIDDEN 403, NOT_FOUND 404, EMAIL_TAKEN 409, SKU_TAKEN 409, INSUFFICIENT_STOCK
 npm install    npm run dev (node --watch src/server.js)    npm test
 npm run migrate (knex migrate:latest)    npm run seed:admin    http://localhost:3000/health
 Env: DATABASE_URL, TEST_DATABASE_URL (throwaway DB only: tests reset the schema),
-     JWT_SECRET, CORS_ORIGINS, PORT, NODE_ENV, DB_POOL_MAX, ADMIN_EMAIL, ADMIN_PASSWORD
+     JWT_SECRET, CORS_ORIGINS, PORT, NODE_ENV, DB_POOL_MAX, ADMIN_EMAIL, ADMIN_PASSWORD,
+     DEMO_ENABLED (default false), DEMO_NAIVE_DELAY_MS (default 25)
