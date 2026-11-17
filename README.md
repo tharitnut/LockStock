@@ -338,6 +338,75 @@ curl -X DELETE http://localhost:3000/products/1 \
   -H "Authorization: Bearer <admin_token>"
 ```
 
+#### Low-Stock Alert Report
+```bash
+curl -X GET "http://localhost:3000/reports/low-stock?threshold=5" \
+  -H "Authorization: Bearer <admin_token>"
+```
+
+#### Sales Performance Report (Excluding Cancelled Orders)
+```bash
+curl -X GET "http://localhost:3000/reports/sales?from=2026-11-01&to=2026-11-30" \
+  -H "Authorization: Bearer <admin_token>"
+```
+Response:
+```json
+{
+  "order_count": 15,
+  "revenue": 1499.50,
+  "top_products": [
+    {
+      "product_id": 1,
+      "sku": "KEY-001",
+      "name": "Mechanical Keyboard",
+      "units": 10,
+      "revenue": 999.90
+    }
+  ]
+}
+```
+
+---
+
+### Customer Endpoints (`Role: customer | admin`)
+
+#### Place Order (1-50 items, ACID Transaction)
+```bash
+curl -X POST http://localhost:3000/orders \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [
+      { "product_id": 1, "quantity": 2 },
+      { "product_id": 2, "quantity": 1 }
+    ]
+  }'
+```
+
+#### List Orders (Own orders; Admin lists all)
+```bash
+curl -X GET "http://localhost:3000/orders?limit=20&offset=0" \
+  -H "Authorization: Bearer <token>"
+```
+
+#### Get Order Details
+```bash
+curl -X GET http://localhost:3000/orders/1 \
+  -H "Authorization: Bearer <token>"
+```
+
+#### Cancel Order (Restores Stock Exactly Once)
+```bash
+curl -X POST http://localhost:3000/orders/1/cancel \
+  -H "Authorization: Bearer <token>"
+```
+
+---
+
+## 🚢 Deployment
+
+For complete production deployment instructions to **Render + Neon PostgreSQL**, see [docs/DEPLOY.md](docs/DEPLOY.md). Includes environment variable tables, migration commands, and post-deployment smoke tests.
+
 ---
 
 ## 🎯 Design Decisions
