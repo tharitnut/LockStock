@@ -6,6 +6,7 @@ import db, { insertAndGetId } from '../db.js';
 import config from '../config.js';
 import { validateBody } from '../middleware/validate.js';
 import { authenticate } from '../middleware/auth.js';
+import { loginRateLimiter } from '../middleware/rateLimit.js';
 import { emailTaken, unauthorized } from '../lib/errors.js';
 
 const router = Router();
@@ -56,8 +57,8 @@ router.post('/register', validateBody(registerSchema), async (req, res, next) =>
   }
 });
 
-// POST /auth/login (public)
-router.post('/login', validateBody(loginSchema), async (req, res, next) => {
+// POST /auth/login (public, rate limited: 10/min/IP)
+router.post('/login', loginRateLimiter, validateBody(loginSchema), async (req, res, next) => {
   try {
     const email = req.body.email.toLowerCase();
     const { password } = req.body;

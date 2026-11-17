@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth.js';
+import { orderRateLimiter } from '../middleware/rateLimit.js';
 import { validateBody, validateParams, validateQuery } from '../middleware/validate.js';
 import {
   placeOrder,
@@ -33,10 +34,11 @@ const listOrdersQuerySchema = z.object({
   user_id: z.preprocess((val) => (val !== undefined && val !== '' ? Number(val) : undefined), z.number().int().positive().optional()),
 });
 
-// POST /orders (authenticated)
+// POST /orders (authenticated, rate limited: 30/min/user)
 router.post(
   '/',
   authenticate,
+  orderRateLimiter,
   validateBody(placeOrderSchema),
   async (req, res, next) => {
     try {

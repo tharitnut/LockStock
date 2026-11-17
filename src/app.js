@@ -5,6 +5,7 @@ import config from './config.js';
 import authRoutes from './routes/auth.js';
 import productsRoutes from './routes/products.js';
 import ordersRoutes from './routes/orders.js';
+import reportsRoutes from './routes/reports.js';
 import { errorHandler } from './middleware/error.js';
 import { notFound } from './lib/errors.js';
 
@@ -28,6 +29,7 @@ app.get('/health', (req, res) => {
 app.use('/auth', authRoutes);
 app.use('/products', productsRoutes);
 app.use('/orders', ordersRoutes);
+app.use('/reports', reportsRoutes);
 
 // 404 Handler for undefined routes
 app.use((req, res, next) => {
