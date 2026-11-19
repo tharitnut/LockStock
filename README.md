@@ -17,6 +17,31 @@ LockStock is a backend portfolio project demonstrating production-grade relation
 
 ---
 
+## 🎮 Live Demo (Interactive Concurrency Visualizer)
+
+LockStock includes an optional static demo page hosted directly at `/demo` (no build steps required, mobile-friendly) that visually proves the power of database row locking within 10 seconds.
+
+### What the Demo Shows:
+- **Parameters**: Customize starting stock (1–100) and concurrent buyers (1–50, e.g. 5 stock vs 20 buyers).
+- **Safe Mode (Production `placeOrder`)**:
+  - Uses `SELECT ... FOR UPDATE` with ascending ID sorting.
+  - Exactly 5 buyers succeed; 15 are rejected with `409 INSUFFICIENT_STOCK`.
+  - Final stock is 0, and the ledger invariant `Stock = SUM(delta)` passes (`✔`).
+- **Unsafe Mode (Demonstration of Naive Read-Check-Write)**:
+  - Demonstrates what happens **without** database row locking.
+  - Multiple buyers read the same stale stock simultaneously, causing **Overselling** (succeeded > 5, negative stock, and broken ledger invariant `✕`).
+- **Automatic Cleanup**: Every run generates a throwaway product (`DEMO-<random>`) and automatically purges all demo records upon completion.
+
+### Environment Flags:
+```env
+DEMO_ENABLED=true          # Enables /demo static page and /demo/api/oversell (default: false -> returns 404)
+DEMO_NAIVE_DELAY_MS=25     # Delay in ms to simulate network latency in unsafe mode (default: 25)
+```
+
+> ⚠️ **Security Warning**: Set `DEMO_ENABLED=true` **only** on demonstration deployments. The unsafe mode deliberately executes uncoordinated writes for educational demonstration and is quarantined strictly within `src/services/demo/`.
+
+---
+
 ## 🛠️ Tech Stack
 
 | Component | Technology | Rationale |
