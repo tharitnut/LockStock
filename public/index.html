@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LockStock — ระบบทดสอบ Concurrency & Anti-Overselling</title>
+  <link rel="stylesheet" href="/demo/demo.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="badge">Portfolio Demo</div>
+      <h1>LockStock Concurrency Demo</h1>
+      <p class="subtitle">พิสูจน์การป้องกันขายเกินสต็อก (Overselling) ด้วย Pessimistic Locking บน PostgreSQL</p>
+    </header>
+
+    <main>
+      <!-- Simulation Controls Card -->
+      <section class="card control-card" aria-labelledby="controls-heading">
+        <h2 id="controls-heading" class="sr-only">ตั้งค่าการจำลอง</h2>
+        
+        <form id="simulation-form" class="form-grid">
+          <div class="input-group">
+            <label for="stock-input">จำนวนสต็อก (1–100 ชิ้น)</label>
+            <input type="number" id="stock-input" name="stock" min="1" max="100" value="5" required>
+          </div>
+
+          <div class="input-group">
+            <label for="buyers-input">จำนวนผู้ซื้อพร้อมกัน (1–50 คน)</label>
+            <input type="number" id="buyers-input" name="buyers" min="1" max="50" value="20" required>
+          </div>
+
+          <fieldset class="input-group mode-group">
+            <legend>โหมดการทำงาน</legend>
+            <div class="radio-options">
+              <label class="radio-label">
+                <input type="radio" name="mode" value="safe" checked>
+                <span class="radio-custom"></span>
+                <span class="mode-text">
+                  <strong>ปลอดภัย (มี Lock)</strong>
+                  <small>SELECT ... FOR UPDATE เรียงตาม ID</small>
+                </span>
+              </label>
+
+              <label class="radio-label">
+                <input type="radio" name="mode" value="unsafe">
+                <span class="radio-custom"></span>
+                <span class="mode-text">
+                  <strong>ไม่ปลอดภัย (ไม่มี Lock)</strong>
+                  <small>อ่านแล้วเขียนทับ (เกิด Overselling)</small>
+                </span>
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="action-row">
+            <button type="submit" id="submit-btn" class="btn btn-primary">
+              <span id="btn-text">เริ่มจำลองการสั่งซื้อพร้อมกัน</span>
+              <span id="btn-spinner" class="spinner hidden" aria-hidden="true"></span>
+            </button>
+          </div>
+        </form>
+
+        <div id="status-message" class="status-message hidden" aria-live="polite"></div>
+      </section>
+
+      <!-- Results Section -->
+      <section id="results-section" class="card results-card hidden" aria-labelledby="results-heading">
+        <h2 id="results-heading">ผลลัพธ์การจำลอง</h2>
+
+        <!-- Summary Metric Cards -->
+        <div class="metrics-grid">
+          <div class="metric-card metric-success">
+            <div class="metric-title">สำเร็จ</div>
+            <div id="stat-succeeded" class="metric-value">0</div>
+            <div class="metric-sub">ได้สินค้า</div>
+          </div>
+
+          <div class="metric-card metric-rejected">
+            <div class="metric-title">ถูกปฏิเสธ</div>
+            <div id="stat-rejected" class="metric-value">0</div>
+            <div class="metric-sub">สต็อกหมด (409)</div>
+          </div>
+
+          <div class="metric-card metric-errors">
+            <div class="metric-title">ผิดพลาด</div>
+            <div id="stat-errors" class="metric-value">0</div>
+            <div class="metric-sub">error อื่นๆ</div>
+          </div>
+
+          <div class="metric-card metric-stock">
+            <div class="metric-title">สต็อกคงเหลือจริง</div>
+            <div id="stat-stock" class="metric-value">0</div>
+            <div class="metric-sub">หลังคำสั่งซื้อเสร็จ</div>
+          </div>
+
+          <div class="metric-card metric-invariant">
+            <div class="metric-title">Stock Invariant</div>
+            <div id="stat-invariant" class="metric-value">ตรวจสอบ...</div>
+            <div class="metric-sub">Stock = Sum(Delta)</div>
+          </div>
+
+          <div class="metric-card metric-time">
+            <div class="metric-title">เวลาที่ใช้</div>
+            <div id="stat-time" class="metric-value">0 ms</div>
+            <div class="metric-sub">รอบประมวลผล</div>
+          </div>
+        </div>
+
+        <!-- Explanation Banner -->
+        <div id="explanation-banner" class="explanation-box" role="status"></div>
+
+        <!-- Buyers Grid -->
+        <div class="buyers-section">
+          <h3>สถานะรายบุคคลของผู้ซื้อทั้งหมด</h3>
+          <div id="buyers-grid" class="buyers-grid" role="list"></div>
+        </div>
+      </section>
+
+      <!-- Technical Details Collapsible -->
+      <section class="card technical-card">
+        <details class="tech-details">
+          <summary><strong>ทำไมโหมดปลอดภัยถึงไม่ขายเกินสต็อก? (Concurrency Architecture)</strong></summary>
+          <div class="tech-content">
+            <p>เมื่อมีคำสั่งซื้อหลายคำขอเข้ามาแย่งซื้อสินค้าชิ้นเดียวกันพร้อมกันในหน่วยมิลลิวินาที:</p>
+            <ol>
+              <li><strong>ACID Transaction:</strong> ทุกการสั่งซื้อเริ่มต้นด้วยคำสั่ง <code>BEGIN TRANSACTION</code></li>
+              <li><strong>Row-level Lock:</strong> ดึงข้อมูลสินค้าด้วย <code>SELECT ... FOR UPDATE</code> โดยเรียงลำดับ ID จากน้อยไปมากเสมอ (Ascending Order) เพื่อขจัดปัญหา Deadlock</li>
+              <li><strong>Exclusive Lock:</strong> คำขอแรกที่เข้าถึงจะได้ Lock แถวสินค้านั้นไว้ คำขออื่นที่เข้ามาพร้อมกันจะหยุดรอ (Block) จนกว่าคำขอแรกจะเสร็จสิ้น</li>
+              <li><strong>ตรวจเช็คและตัดสต็อก:</strong> เมื่อคำขอลำดับถัดไปได้รับ Lock จะได้ข้อมูลสต็อกล่าสุดที่อัปเดตแล้วจริง จึงตรวจสอบพบว่าสต็อกหมด และตอบกลับด้วย <code>409 INSUFFICIENT_STOCK</code> ทันที โดยสต็อกไม่ติดลบ</li>
+              <li><strong>Audit Ledger:</strong> ทุกการตัดสต็อกจะบันทึกลงสมุดบัญชี <code>stock_movements</code> เสมอ ทำให้ตรวจสอบย้อนหลังได้ตลอดเวลา</li>
+            </ol>
+          </div>
+        </details>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>LockStock API — Junior Backend Portfolio Project &copy; 2026</p>
+    </footer>
+  </div>
+
+  <script src="/demo/demo.js"></script>
+</body>
+</html>
