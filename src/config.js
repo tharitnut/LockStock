@@ -38,6 +38,8 @@ const config = {
   dbPoolMax: parseInt(process.env.DB_POOL_MAX || (isTest ? '20' : '10'), 10),
   adminEmail: (process.env.ADMIN_EMAIL || 'admin@example.com').trim().toLowerCase(),
   adminPassword: process.env.ADMIN_PASSWORD || 'adminpassword123',
+  demoEnabled: process.env.DEMO_ENABLED === 'true',
+  demoNaiveDelayMs: parseInt(process.env.DEMO_NAIVE_DELAY_MS || '25', 10),
 };
 
 export default config;
