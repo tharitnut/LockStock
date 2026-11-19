@@ -1,5 +1,10 @@
 # LockStock API
 
+[![CI](https://github.com/tharitnut/LockStock/actions/workflows/ci.yml/badge.svg)](https://github.com/tharitnut/LockStock/actions/workflows/ci.yml)
+![Node.js](https://img.shields.io/badge/Node.js-20.x%20LTS-green)
+![Express](https://img.shields.io/badge/Express-5.x-blue)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue)
+
 > **Inventory & Order REST API with Transactional Concurrency Control**  
 > Built with Node.js, Express 5, Knex, PostgreSQL (Neon), and Vitest. Designed to demonstrate correct transactional behavior under high concurrency—preventing overselling, eliminating deadlocks, and maintaining strict ledger invariants.
 
